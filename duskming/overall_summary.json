@@ -1,0 +1,43 @@
+{
+  "total_images": 11,
+  "vaes_processed": [
+    "ae",
+    "MS-LC-EQ-D-VR VAE FLUX",
+    "Pad Flux EQ v2 B1"
+  ],
+  "vae_summaries": {
+    "ae": {
+      "vae_name": "ae",
+      "num_images": 11,
+      "avg_mse": 0.00038147102962036365,
+      "avg_psnr": 34.311582738702946,
+      "min_psnr": 33.141876220703125,
+      "max_psnr": 37.19855880737305,
+      "std_psnr": 1.113304684586594,
+      "avg_ssim": 0.9999743374911222,
+      "std_ssim": 6.63969396556989e-06
+    },
+    "MS-LC-EQ-D-VR VAE FLUX": {
+      "vae_name": "MS-LC-EQ-D-VR VAE FLUX",
+      "num_images": 11,
+      "avg_mse": 0.0004377835879991339,
+      "avg_psnr": 33.72352669455788,
+      "min_psnr": 31.77428436279297,
+      "max_psnr": 35.72319793701172,
+      "std_psnr": 1.0992370646046685,
+      "avg_ssim": 0.9999901543964039,
+      "std_ssim": 2.738609885478099e-06
+    },
+    "Pad Flux EQ v2 B1": {
+      "vae_name": "Pad Flux EQ v2 B1",
+      "num_images": 11,
+      "avg_mse": 0.0001966763679361479,
+      "avg_psnr": 37.172475294633344,
+      "min_psnr": 35.50696563720703,
+      "max_psnr": 39.10842514038086,
+      "std_psnr": 0.9911757666619225,
+      "avg_ssim": 0.9999964183027094,
+      "std_ssim": 6.526663054081981e-07
+    }
+  }
+}

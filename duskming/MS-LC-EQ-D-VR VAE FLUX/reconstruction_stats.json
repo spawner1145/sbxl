@@ -1,0 +1,117 @@
+{
+  "vae_path": "MS-LC-EQ-D-VR VAE FLUX.safetensors",
+  "vae_name": "MS-LC-EQ-D-VR VAE FLUX",
+  "processed_at": "d:\\code\\sbxl\\sd-scripts",
+  "images": {
+    "image_0002.jpg": {
+      "original_size": [
+        2682,
+        3732
+      ],
+      "latent_shape": null,
+      "mse": 0.0005069643375463784,
+      "psnr": 32.950225830078125,
+      "ssim": 0.9999890327453613
+    },
+    "image_0003.jpg": {
+      "original_size": [
+        2307,
+        3508
+      ],
+      "latent_shape": null,
+      "mse": 0.0003547732485458255,
+      "psnr": 34.500492095947266,
+      "ssim": 0.9999931454658508
+    },
+    "image_0005.jpg": {
+      "original_size": [
+        3407,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.0002982946753036231,
+      "psnr": 35.25354766845703,
+      "ssim": 0.9999871850013733
+    },
+    "image_0007.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.0002677197044249624,
+      "psnr": 35.72319793701172,
+      "ssim": 0.9999942183494568
+    },
+    "image_0010.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.000519776192959398,
+      "psnr": 32.841835021972656,
+      "ssim": 0.9999900460243225
+    },
+    "image_0011.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.000664616993162781,
+      "psnr": 31.77428436279297,
+      "ssim": 0.9999881386756897
+    },
+    "image_0013.jpg": {
+      "original_size": [
+        2578,
+        3368
+      ],
+      "latent_shape": null,
+      "mse": 0.0004847875388804823,
+      "psnr": 33.14448547363281,
+      "ssim": 0.999991238117218
+    },
+    "image_0021.jpg": {
+      "original_size": [
+        2413,
+        3449
+      ],
+      "latent_shape": null,
+      "mse": 0.00045424894778989255,
+      "psnr": 33.42706298828125,
+      "ssim": 0.9999915957450867
+    },
+    "image_0032.jpg": {
+      "original_size": [
+        1637,
+        2324
+      ],
+      "latent_shape": null,
+      "mse": 0.0004905613022856414,
+      "psnr": 33.09306716918945,
+      "ssim": 0.9999898672103882
+    },
+    "image_0033.jpg": {
+      "original_size": [
+        2515,
+        4096
+      ],
+      "latent_shape": null,
+      "mse": 0.0003760654362849891,
+      "psnr": 34.24736404418945,
+      "ssim": 0.9999927878379822
+    },
+    "image_0037.jpg": {
+      "original_size": [
+        4096,
+        2515
+      ],
+      "latent_shape": null,
+      "mse": 0.0003978110908064991,
+      "psnr": 34.003231048583984,
+      "ssim": 0.9999844431877136
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "vae_path": "ae.safetensors",
+  "vae_name": "ae",
+  "processed_at": "d:\\code\\sbxl\\sd-scripts",
+  "images": {
+    "image_0002.jpg": {
+      "original_size": [
+        2682,
+        3732
+      ],
+      "latent_shape": null,
+      "mse": 0.00036324263783171773,
+      "psnr": 34.398033142089844,
+      "ssim": 0.9999784231185913
+    },
+    "image_0003.jpg": {
+      "original_size": [
+        2307,
+        3508
+      ],
+      "latent_shape": null,
+      "mse": 0.00048507872270420194,
+      "psnr": 33.141876220703125,
+      "ssim": 0.999975323677063
+    },
+    "image_0005.jpg": {
+      "original_size": [
+        3407,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.00028034960268996656,
+      "psnr": 35.52299880981445,
+      "ssim": 0.99997478723526
+    },
+    "image_0007.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.0004029544070363045,
+      "psnr": 33.94744110107422,
+      "ssim": 0.9999595284461975
+    },
+    "image_0010.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.0003731710894498974,
+      "psnr": 34.280921936035156,
+      "ssim": 0.9999704360961914
+    },
+    "image_0011.jpg": {
+      "original_size": [
+        3420,
+        2100
+      ],
+      "latent_shape": null,
+      "mse": 0.00044456790783442557,
+      "psnr": 33.5206184387207,
+      "ssim": 0.9999735951423645
+    },
+    "image_0013.jpg": {
+      "original_size": [
+        2578,
+        3368
+      ],
+      "latent_shape": null,
+      "mse": 0.00038361840415745974,
+      "psnr": 34.16100311279297,
+      "ssim": 0.9999761581420898
+    },
+    "image_0021.jpg": {
+      "original_size": [
+        2413,
+        3449
+      ],
+      "latent_shape": null,
+      "mse": 0.0004379795864224434,
+      "psnr": 33.58546447753906,
+      "ssim": 0.9999738931655884
+    },
+    "image_0032.jpg": {
+      "original_size": [
+        1637,
+        2324
+      ],
+      "latent_shape": null,
+      "mse": 0.00036107932101003826,
+      "psnr": 34.423973083496094,
+      "ssim": 0.999973714351654
+    },
+    "image_0033.jpg": {
+      "original_size": [
+        2515,
+        4096
+      ],
+      "latent_shape": null,
+      "mse": 0.0004735303809866309,
+      "psnr": 33.24652099609375,
+      "ssim": 0.9999725222587585
+    },
+    "image_0037.jpg": {
+      "original_size": [
+        4096,
+        2515
+      ],
+      "latent_shape": null,
+      "mse": 0.00019060926570091397,
+      "psnr": 37.19855880737305,
+      "ssim": 0.9999893307685852
+    }
+  }
+}
