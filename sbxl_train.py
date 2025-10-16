@@ -528,6 +528,15 @@ def train(args):
         sbxl_utils.save_sbxl_unet(unwrapped_unet, save_path, dtype=save_dtype, metadata=build_save_metadata(epoch_no, step_no))
         if args.huggingface_repo_id is not None:
             huggingface_util.upload(args, save_path, "/" + ckpt_name)
+        
+        # Save training state if requested
+        if args.save_state:
+            state_name = ckpt_name.replace('.sft', '_state').replace('.safetensors', '_state')
+            state_dir = os.path.join(args.output_dir, state_name)
+            logger.info(f"Saving training state to {state_dir}")
+            accelerator.save_state(state_dir)
+            if args.save_state_to_huggingface and args.huggingface_repo_id is not None:
+                huggingface_util.upload(args, state_dir, "/" + state_name)
 
     for epoch in range(num_train_epochs):
         logger.info(f"\nEpoch {epoch+1}/{num_train_epochs}")
@@ -675,6 +684,27 @@ def train(args):
                             if os.path.exists(old_path):
                                 logger.info(f"Removing old checkpoint {old_path}")
                                 os.remove(old_path)
+                        
+                        # Save state stepwise if requested
+                        if args.save_last_n_steps_state is not None:
+                            import os
+                            model_name = train_util.default_if_none(args.output_name, "step")
+                            state_dir = os.path.join(args.output_dir, f"{model_name}-{global_step}-state")
+                            logger.info(f"Saving training state at step {global_step} to {state_dir}")
+                            accelerator.save_state(state_dir)
+                            if args.save_state_to_huggingface and args.huggingface_repo_id is not None:
+                                huggingface_util.upload(args, state_dir, f"/{model_name}-{global_step}-state")
+                            
+                            # Remove old states
+                            last_n_steps = args.save_last_n_steps_state
+                            remove_step_no = global_step - last_n_steps - 1
+                            remove_step_no = remove_step_no - (remove_step_no % args.save_every_n_steps) if args.save_every_n_steps > 0 else remove_step_no
+                            if remove_step_no > 0:
+                                old_state_dir = os.path.join(args.output_dir, f"{model_name}-{remove_step_no}-state")
+                                if os.path.exists(old_state_dir):
+                                    logger.info(f"Removing old state: {old_state_dir}")
+                                    import shutil
+                                    shutil.rmtree(old_state_dir)
             
             if global_step >= args.max_train_steps:
                 break
@@ -694,6 +724,26 @@ def train(args):
                     if os.path.exists(old_path):
                         logger.info(f"Removing old checkpoint {old_path}")
                         os.remove(old_path)
+                
+                # Save state on epoch end if requested
+                if args.save_last_n_epochs_state is not None:
+                    import os
+                    model_name = train_util.default_if_none(args.output_name, "epoch")
+                    state_dir = os.path.join(args.output_dir, f"{model_name}-{epoch + 1}-state")
+                    logger.info(f"Saving training state at epoch {epoch + 1} to {state_dir}")
+                    accelerator.save_state(state_dir)
+                    if args.save_state_to_huggingface and args.huggingface_repo_id is not None:
+                        huggingface_util.upload(args, state_dir, f"/{model_name}-{epoch + 1}-state")
+                    
+                    # Remove old states
+                    last_n_epochs = args.save_last_n_epochs_state
+                    remove_epoch_no = (epoch + 1) - args.save_every_n_epochs * last_n_epochs
+                    if remove_epoch_no > 0:
+                        old_state_dir = os.path.join(args.output_dir, f"{model_name}-{remove_epoch_no}-state")
+                        if os.path.exists(old_state_dir):
+                            logger.info(f"Removing old state: {old_state_dir}")
+                            import shutil
+                            shutil.rmtree(old_state_dir)
         
         if global_step >= args.max_train_steps:
             break
@@ -716,6 +766,18 @@ def train(args):
         ckpt_name = train_util.get_last_ckpt_name(args, ckpt_ext)
         logger.info(f"Saving final checkpoint to {os.path.join(args.output_dir, ckpt_name)}")
         save_checkpoint(ckpt_name, num_train_epochs, global_step)
+    
+    # Save final training state if requested
+    if args.save_state_on_train_end:
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            import os
+            model_name = train_util.default_if_none(args.output_name, "last")
+            state_dir = os.path.join(args.output_dir, f"{model_name}_state")
+            logger.info(f"Saving final training state to {state_dir}")
+            accelerator.save_state(state_dir)
+            if args.save_state_to_huggingface and args.huggingface_repo_id is not None:
+                huggingface_util.upload(args, state_dir, f"/{model_name}_state")
     
     accelerator.end_training()
     logger.info("Training complete!")

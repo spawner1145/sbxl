@@ -527,7 +527,7 @@ class SBXLNetworkTrainer(train_network.NetworkTrainer):
     
     def get_sai_model_spec(self, args):
         """Get SAI model spec for SBXL"""
-        return train_util.get_sai_model_spec(None, args, False, True, False, flux="sbxl")
+        return train_util.get_sai_model_spec(None, args, False, True, False, flux="dev")
     
     def update_metadata(self, metadata, args):
         """Update metadata with SBXL specific info"""
@@ -552,12 +552,28 @@ class SBXLNetworkTrainer(train_network.NetworkTrainer):
         return args.cache_text_encoder_outputs and not self.train_text_encoder
     
     def prepare_text_encoder_grad_ckpt_workaround(self, index, text_encoder):
-        """Prepare text encoder for gradient checkpointing"""
-        # Sakiko text encoder - make embeddings trainable
-        if hasattr(text_encoder, 'model') and hasattr(text_encoder.model, 'embed_tokens'):
-            text_encoder.model.embed_tokens.requires_grad_(True)
-        elif hasattr(text_encoder, 'embed_tokens'):
-            text_encoder.embed_tokens.requires_grad_(True)
+        """Prepare text encoder for gradient checkpointing - SBXL specific"""
+        # For SBXL's Sakiko text encoder, check if it has the expected structure
+        if hasattr(text_encoder, 'text_model') and hasattr(text_encoder.text_model, 'embeddings'):
+            text_encoder.text_model.embeddings.requires_grad_(True)
+        else:
+            # For other structures, try to find embeddings
+            if hasattr(text_encoder, 'embeddings'):
+                text_encoder.embeddings.requires_grad_(True)
+            else:
+                logger.warning("Could not find embeddings in text encoder for gradient checkpointing workaround")
+    
+    def prepare_text_encoder_fp8(self, index, text_encoder, te_weight_dtype, weight_dtype):
+        """Prepare text encoder for fp8 - SBXL specific"""
+        # For SBXL's Sakiko text encoder, check if it has the expected structure
+        if hasattr(text_encoder, 'text_model') and hasattr(text_encoder.text_model, 'embeddings'):
+            text_encoder.text_model.embeddings.to(dtype=te_weight_dtype)
+        else:
+            # For other structures, try to find embeddings
+            if hasattr(text_encoder, 'embeddings'):
+                text_encoder.embeddings.to(dtype=te_weight_dtype)
+            else:
+                logger.warning("Could not find embeddings in text encoder for fp8 preparation")
 
 
 def setup_parser() -> argparse.ArgumentParser:
