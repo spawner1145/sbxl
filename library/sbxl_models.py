@@ -993,21 +993,11 @@ def get_timestep_embedding(
     timesteps: torch.Tensor,
     embedding_dim: int,
     max_period: int = 10000,
+    time_factor: float = 1000.0,
 ):
-    """Create sinusoidal timestep embeddings"""
-    assert len(timesteps.shape) == 1
-    
-    half_dim = embedding_dim // 2
-    freqs = torch.exp(
-        -math.log(max_period) * torch.arange(start=0, end=half_dim, dtype=torch.float32, device=timesteps.device) / half_dim
-    )
-    args = timesteps[:, None].float() * freqs[None]
-    embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-    
-    if embedding_dim % 2:
-        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
-    
-    return embedding.to(dtype=timesteps.dtype)
+    """Create sinusoidal timestep embeddings - copied from Flux"""
+    from library.flux_models import timestep_embedding
+    return timestep_embedding(timesteps, embedding_dim, max_period, time_factor)
 
 
 class ControlNetConditioningEmbedding(nn.Module):

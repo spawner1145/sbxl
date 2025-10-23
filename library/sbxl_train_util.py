@@ -329,7 +329,7 @@ def get_schedule(
     shift: bool = True,
 ) -> List[float]:
     """
-    Get timestep schedule for flow sampling
+    Get timestep schedule for flow sampling - copied from Flux
     
     Args:
         num_steps: Number of sampling steps
@@ -341,14 +341,15 @@ def get_schedule(
     Returns:
         List of timesteps
     """
-    # Extra step for zero
-    timesteps = torch.linspace(1000, 0, num_steps + 1)
-    
-    # Shift schedule to favor high timesteps for higher signal images
+    # extra step for zero
+    timesteps = torch.linspace(1, 0, num_steps + 1)
+
+    # shifting the schedule to favor high timesteps for higher signal images
     if shift:
+        # eastimate mu based on linear estimation between two points
         mu = get_lin_function(y1=base_shift, y2=max_shift)(image_seq_len)
         timesteps = time_shift(mu, 1.0, timesteps)
-    
+
     return timesteps.tolist()
 
 
@@ -381,7 +382,7 @@ def denoise_step(
     Returns:
         Predicted velocity
     """
-    # Prepare timestep
+    # Prepare timestep (no manual scaling, let embedding handle it)
     t = torch.tensor([timestep], device=img.device, dtype=img.dtype)
     t = t.expand(img.shape[0])
     
@@ -473,10 +474,10 @@ def euler_sample(
     controlnet: Optional[torch.nn.Module] = None,
     controlnet_cond: Optional[torch.Tensor] = None,
     conditioning_scale: float = 1.0,
-    progress_bar: Optional = None,
+    progress_bar: Optional[Any] = None,
 ) -> torch.Tensor:
     """
-    Euler sampling for flow matching
+    Euler sampling for flow matching - adapted from Flux denoise function
     
     Args:
         model: SBXL UNet model
@@ -493,6 +494,9 @@ def euler_sample(
     """
     model.eval()
     
+    # prepare classifier free guidance
+    do_cfg = neg_txt_emb is not None and guidance_scale != 1.0
+    
     iterator = range(len(timesteps) - 1)
     if progress_bar is not None:
         iterator = progress_bar(iterator, desc="Sampling", total=len(timesteps) - 1)
@@ -500,9 +504,8 @@ def euler_sample(
     for i in iterator:
         t_curr = timesteps[i]
         t_next = timesteps[i + 1]
-        dt = t_next - t_curr
         
-        # Predict velocity
+        # Predict velocity using denoise_step
         with torch.no_grad():
             pred = denoise_step(
                 model,
@@ -518,8 +521,8 @@ def euler_sample(
                 conditioning_scale=conditioning_scale,
             )
         
-        # Euler step
-        img = img + pred * dt
+        # Euler step (copied from Flux)
+        img = img + (t_next - t_curr) * pred
     
     return img
 
