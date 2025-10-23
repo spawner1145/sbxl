@@ -577,6 +577,7 @@ class SBXLNetworkTrainer(train_network.NetworkTrainer):
 
 
 def setup_parser() -> argparse.ArgumentParser:
+    import os
     parser = train_network.setup_parser()
     # train_util.add_dit_training_arguments(parser)  # SBXL has its own arguments
     parser.add_argument(
