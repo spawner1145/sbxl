@@ -846,7 +846,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--discrete_flow_shift",
         type=float,
-        default=3.0,
+        default=3.185,
         help="Discrete flow shift for noise scheduler",
     )
     parser.add_argument(

@@ -6,6 +6,7 @@ import random
 from typing import Optional, List
 from PIL import Image
 
+import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel
@@ -154,13 +155,23 @@ def generate_image(
     
     # Get timestep schedule
     image_seq_len = latent_height * latent_width
-    timesteps = sbxl_train_util.get_schedule(
-        num_steps=steps,
-        image_seq_len=image_seq_len,
-        base_shift=0.5,
-        max_shift=1.15,
-        shift=True,
-    )
+    if hasattr(args, 'discrete_flow_shift') and args.discrete_flow_shift != 3.185:
+        # Use legacy inference schedule if explicitly set to different value
+        logger.info(f"Using legacy inference schedule (discrete_flow_shift={args.discrete_flow_shift})")
+        timesteps = sbxl_train_util.get_schedule(
+            num_steps=steps,
+            image_seq_len=image_seq_len,
+            base_shift=0.5,
+            max_shift=1.15,
+            shift=True,
+        )
+    else:
+        # Use training-compatible shift (default 3.185)
+        logger.info(f"Using training-compatible discrete_flow_shift={args.discrete_flow_shift}")
+        timesteps = get_schedule_from_shift(
+            num_steps=steps,
+            shift=args.discrete_flow_shift,
+        )
     
     # Sampling loop
     logger.info(f"Sampling with {steps} steps, guidance_scale={guidance_scale}...")
@@ -196,6 +207,52 @@ def generate_image(
     return pil_images
 
 
+def get_schedule(
+    num_steps: int,
+    image_seq_len: int,
+    base_shift: float = 0.5,
+    max_shift: float = 1.15,
+    shift: bool = True,
+) -> list[float]:
+    # extra step for zero
+    timesteps = torch.linspace(1, 0, num_steps + 1)
+
+    # shifting the schedule to favor high timesteps for higher signal images
+    if shift:
+        # eastimate mu based on linear estimation between two points
+        mu = get_lin_function(y1=base_shift, y2=max_shift)(image_seq_len)
+        timesteps = time_shift(mu, 1.0, timesteps)
+
+    return timesteps.tolist()
+
+
+def get_schedule_from_shift(
+    num_steps: int,
+    shift: float,
+) -> list[float]:
+    """
+    Get timestep schedule using the same logic as FlowMatchEulerDiscreteScheduler
+    
+    Args:
+        num_steps: Number of sampling steps
+        shift: Discrete flow shift value (same as training)
+    
+    Returns:
+        List of timesteps (0-1 range for inference)
+    """
+    # Use the same logic as FlowMatchEulerDiscreteScheduler
+    timesteps_np = np.linspace(1, num_steps, num_steps, dtype=np.float32)[::-1].copy()
+    timesteps = torch.from_numpy(timesteps_np).to(dtype=torch.float32)
+    sigmas = timesteps / num_steps
+    sigmas = shift * sigmas / (1 + (shift - 1) * sigmas)
+    
+    # sigmas are already in 0-1 range, add final 0
+    sigmas_list = sigmas.tolist()
+    sigmas_list.append(0.0)
+    
+    return sigmas_list
+
+
 def main():
     parser = argparse.ArgumentParser(description="SBXL minimal inference")
     
@@ -224,6 +281,8 @@ def main():
     parser.add_argument("--steps", type=int, default=28, help="Number of sampling steps")
     parser.add_argument("--guidance_scale", type=float, default=3.5, help="Guidance scale for CFG")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument("--discrete_flow_shift", type=float, default=3.185, 
+                        help="Discrete flow shift for timestep scheduling (should match training shift)")
     
     # Device and dtype
     parser.add_argument("--device", type=str, default=None, help="Device to use")
