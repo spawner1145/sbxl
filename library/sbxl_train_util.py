@@ -677,7 +677,7 @@ def decode_latents(
         Decoded images
     """
     with torch.no_grad():
-        dec = vae.decode(latents)
+        dec = vae.decode(latents.to(vae.dtype))
         if hasattr(dec, "sample"):
             images = dec.sample
         else:

@@ -418,7 +418,9 @@ class SBXLNetworkTrainer(train_network.NetworkTrainer):
     
     def encode_images_to_latents(self, args, vae, images):
         """Encode images to latents using VAE"""
-        return vae.encode(images)
+        # Ensure VAE is on the correct device and images are in correct dtype
+        vae.to(images.device)
+        return vae.encode(images.to(vae.dtype))
     
     def shift_scale_latents(self, args, latents):
         """Shift and scale latents - SBXL uses Flux VAE which handles scaling internally"""

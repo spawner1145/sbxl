@@ -554,13 +554,12 @@ def train(args):
                 if "latents" in batch and batch["latents"] is not None:
                     latents = batch["latents"].to(accelerator.device, dtype=weight_dtype)
                 else:
-                    if ae is None:
-                        raise ValueError(
-                            "Latents not provided in batch and VAE not available. Pass --vae or enable --cache_latents."
-                        )
                     with torch.no_grad():
-                        images = batch["images"].to(ae.device, dtype=ae.dtype)
-                        latents = ae.encode(images)
+                        # encode images to latents. images are [-1, 1]
+                        # Ensure VAE is on the correct device and use same approach as test_vae_reconstruction.py
+                        ae.to(accelerator.device)
+                        latents = ae.encode(batch["images"].to(ae.device).to(ae.dtype))
+
                     latents = latents.to(accelerator.device, dtype=weight_dtype)
 
                 # Get text encoder outputs
