@@ -58,6 +58,7 @@ def train(args):
     
     This implements the full training loop based on flux_train.py structure.
     """
+    import os
     train_util.verify_training_args(args)
     train_util.prepare_dataset_args(args, True)
     deepspeed_utils.prepare_deepspeed_args(args)
