@@ -534,35 +534,44 @@ def euler_sample(
 def sample_timesteps(
     batch_size: int,
     device: torch.device,
-    dtype: torch.dtype = torch.float32,
+    dtype: torch.dtype,
     weighting_scheme: str = "uniform",
+    logit_mean: float = 0.0,
+    logit_std: float = 1.0,
+    mode_scale: float = 1.29,
 ) -> torch.Tensor:
     """
-    Sample timesteps for training
+    Sample timesteps for training based on weighting scheme
     
     Args:
         batch_size: Batch size
-        device: Device
+        device: Device to place tensors on
         dtype: Data type
-        weighting_scheme: Weighting scheme ("uniform", "logit_normal")
+        weighting_scheme: Weighting scheme ("uniform", "logit_normal", "mode")
+        logit_mean: Mean for logit normal distribution
+        logit_std: Standard deviation for logit normal distribution
+        mode_scale: Scale for mode distribution
     
     Returns:
-        Sampled timesteps
+        Sampled timesteps in [0, 1] range
     """
-    if weighting_scheme == "uniform":
-        # Uniform sampling in [0, 1]
-        timesteps = torch.rand(batch_size, device=device, dtype=dtype)
-    elif weighting_scheme == "logit_normal":
-        # Logit-normal sampling (better for flow matching)
-        u = torch.randn(batch_size, device=device, dtype=dtype)
-        timesteps = torch.sigmoid(u)
+    if weighting_scheme == "logit_normal":
+        # Sample from logit normal distribution
+        u = torch.randn((batch_size,), device=device, dtype=dtype)
+        u = u * logit_std + logit_mean
+        sigmas = torch.sigmoid(u)
+    elif weighting_scheme == "mode":
+        # Sample from mode distribution (heavier tails)
+        u = torch.randn((batch_size,), device=device, dtype=dtype)
+        u = u * logit_std + logit_mean
+        # Apply mode scaling
+        u = u * mode_scale
+        sigmas = torch.sigmoid(u)
     else:
-        raise ValueError(f"Unknown weighting scheme: {weighting_scheme}")
+        # Uniform sampling
+        sigmas = torch.rand((batch_size,), device=device, dtype=dtype)
     
-    # Avoid timesteps exactly at 0 or 1
-    timesteps = torch.clamp(timesteps, min=1e-4, max=1.0 - 1e-4)
-    
-    return timesteps
+    return sigmas
 
 
 def compute_loss_weighting(
@@ -893,21 +902,19 @@ def save_checkpoint(
 
 
 def get_noisy_model_input_and_timesteps(
-    args,
-    noise_scheduler,
     latents: torch.Tensor,
     noise: torch.Tensor,
+    args: argparse.Namespace,
     device: torch.device,
     dtype: torch.dtype,
-) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Get noisy model input and timesteps for SBXL flow matching training
+    Get noisy model input and timesteps for flow matching training
     
     Args:
-        args: Training arguments
-        noise_scheduler: Noise scheduler
         latents: Clean latents
-        noise: Noise tensor
+        noise: Noise to add
+        args: Training arguments
         device: Device
         dtype: Data type
 
@@ -928,17 +935,21 @@ def get_noisy_model_input_and_timesteps(
     mode_scale = getattr(args, "mode_scale", 1.29)
 
     if timestep_sampling == "uniform" and weighting_scheme in {"logit_normal", "mode"}:
-        sigmas = compute_density_for_timestep_sampling(
-            weighting_scheme=weighting_scheme,
+        # Use sample_timesteps for consistency with other flow matching models
+        sigmas = sample_timesteps(
             batch_size=bsz,
+            device=device,
+            dtype=dtype,
+            weighting_scheme=weighting_scheme,
             logit_mean=logit_mean,
             logit_std=logit_std,
             mode_scale=mode_scale,
-        ).to(device=device, dtype=dtype)
+        )
     elif timestep_sampling == "sigmoid":
         sigmoid_scale = getattr(args, "sigmoid_scale", 1.0)
         sigmas = torch.sigmoid(sigmoid_scale * torch.randn((bsz,), device=device, dtype=dtype))
     elif timestep_sampling == "shift":
+        # For shift sampling, we need to handle it directly since it uses discrete_flow_shift
         shift = getattr(args, "discrete_flow_shift", 3.0)
         sigmoid_scale = getattr(args, "sigmoid_scale", 1.0)
         sigmas = torch.randn((bsz,), device=device, dtype=dtype)
