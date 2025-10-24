@@ -902,9 +902,10 @@ def save_checkpoint(
 
 
 def get_noisy_model_input_and_timesteps(
+    args: argparse.Namespace,
+    noise_scheduler,
     latents: torch.Tensor,
     noise: torch.Tensor,
-    args: argparse.Namespace,
     device: torch.device,
     dtype: torch.dtype,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -912,9 +913,10 @@ def get_noisy_model_input_and_timesteps(
     Get noisy model input and timesteps for flow matching training
     
     Args:
+        args: Training arguments
+        noise_scheduler: Noise scheduler (unused, kept for compatibility)
         latents: Clean latents
         noise: Noise to add
-        args: Training arguments
         device: Device
         dtype: Data type
 
@@ -950,7 +952,7 @@ def get_noisy_model_input_and_timesteps(
         sigmas = torch.sigmoid(sigmoid_scale * torch.randn((bsz,), device=device, dtype=dtype))
     elif timestep_sampling == "shift":
         # For shift sampling, we need to handle it directly since it uses discrete_flow_shift
-        shift = getattr(args, "discrete_flow_shift", 3.0)
+        shift = getattr(args, "discrete_flow_shift", 3.185)
         sigmoid_scale = getattr(args, "sigmoid_scale", 1.0)
         sigmas = torch.randn((bsz,), device=device, dtype=dtype)
         sigmas = torch.sigmoid(sigmas * sigmoid_scale)
