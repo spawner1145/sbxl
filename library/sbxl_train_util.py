@@ -531,49 +531,6 @@ def euler_sample(
 # Training utilities
 # ============================================================================
 
-def sample_timesteps(
-    batch_size: int,
-    device: torch.device,
-    dtype: torch.dtype,
-    weighting_scheme: str = "uniform",
-    logit_mean: float = 0.0,
-    logit_std: float = 1.0,
-    mode_scale: float = 1.29,
-) -> torch.Tensor:
-    """
-    Sample timesteps for training based on weighting scheme
-    
-    Args:
-        batch_size: Batch size
-        device: Device to place tensors on
-        dtype: Data type
-        weighting_scheme: Weighting scheme ("uniform", "logit_normal", "mode")
-        logit_mean: Mean for logit normal distribution
-        logit_std: Standard deviation for logit normal distribution
-        mode_scale: Scale for mode distribution
-    
-    Returns:
-        Sampled timesteps in [0, 1] range
-    """
-    if weighting_scheme == "logit_normal":
-        # Sample from logit normal distribution
-        u = torch.randn((batch_size,), device=device, dtype=dtype)
-        u = u * logit_std + logit_mean
-        sigmas = torch.sigmoid(u)
-    elif weighting_scheme == "mode":
-        # Sample from mode distribution (heavier tails)
-        u = torch.randn((batch_size,), device=device, dtype=dtype)
-        u = u * logit_std + logit_mean
-        # Apply mode scaling
-        u = u * mode_scale
-        sigmas = torch.sigmoid(u)
-    else:
-        # Uniform sampling
-        sigmas = torch.rand((batch_size,), device=device, dtype=dtype)
-    
-    return sigmas
-
-
 def compute_loss_weighting(
     timesteps: torch.Tensor,
     weighting_scheme: str = "uniform",
@@ -901,6 +858,53 @@ def save_checkpoint(
     logger.info(f"Saved checkpoint to {save_path}")
 
 
+def get_sigmas(noise_scheduler, timesteps, device, n_dim=4, dtype=torch.float32):
+    """
+    Get sigmas for timesteps from noise scheduler
+    
+    Args:
+        noise_scheduler: Noise scheduler instance
+        timesteps: Timesteps tensor
+        device: Device
+        n_dim: Number of dimensions for output
+        dtype: Data type
+    
+    Returns:
+        Sigmas tensor
+    """
+    sigmas = noise_scheduler.sigmas.to(device=device, dtype=dtype)
+    schedule_timesteps = noise_scheduler.timesteps.to(device)
+    timesteps = timesteps.to(device)
+    step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
+
+    sigma = sigmas[step_indices].flatten()
+    while len(sigma.shape) < n_dim:
+        sigma = sigma.unsqueeze(-1)
+    return sigma
+
+
+def compute_density_for_timestep_sampling(
+    weighting_scheme: str, batch_size: int, logit_mean: float = None, logit_std: float = None, mode_scale: float = None
+):
+    """
+    Compute the density for sampling the timesteps when doing SD3 training.
+
+    Courtesy: This was contributed by Rafie Walker in https://github.com/huggingface/diffusers/pull/8528.
+
+    SD3 paper reference: https://arxiv.org/abs/2403.03206v1.
+    """
+    if weighting_scheme == "logit_normal":
+        # See 3.1 in the SD3 paper ($rf/lognorm(0.00,1.00)$).
+        u = torch.normal(mean=logit_mean, std=logit_std, size=(batch_size,), device="cpu")
+        u = torch.nn.functional.sigmoid(u)
+    elif weighting_scheme == "mode":
+        u = torch.rand(size=(batch_size,), device="cpu")
+        u = 1 - u - mode_scale * (torch.cos(math.pi * u / 2) ** 2 - 1 + u)
+    else:
+        u = torch.rand(size=(batch_size,), device="cpu")
+    return u
+
+
 def get_noisy_model_input_and_timesteps(
     args: argparse.Namespace,
     noise_scheduler,
@@ -914,7 +918,7 @@ def get_noisy_model_input_and_timesteps(
     
     Args:
         args: Training arguments
-        noise_scheduler: Noise scheduler (unused, kept for compatibility)
+        noise_scheduler: Noise scheduler (used for non-uniform timestep sampling)
         latents: Clean latents
         noise: Noise to add
         device: Device
@@ -927,7 +931,8 @@ def get_noisy_model_input_and_timesteps(
     if bsz == 0:
         raise ValueError("Batch size must be greater than zero when sampling timesteps")
 
-    num_timesteps = 1000  # Fixed for SBXL
+    num_timesteps = getattr(noise_scheduler.config, 'num_train_timesteps', 1000)  # Use scheduler's timesteps if available
+    sigmas = None
 
     # Sample sigmas based on sampling strategy / weighting
     timestep_sampling = getattr(args, "timestep_sampling", "uniform")
@@ -937,19 +942,22 @@ def get_noisy_model_input_and_timesteps(
     mode_scale = getattr(args, "mode_scale", 1.29)
 
     if timestep_sampling == "uniform" and weighting_scheme in {"logit_normal", "mode"}:
-        # Use sample_timesteps for consistency with other flow matching models
-        sigmas = sample_timesteps(
-            batch_size=bsz,
-            device=device,
-            dtype=dtype,
+        # For non-uniform weighting schemes, sample from scheduler's timesteps like Flux/Lumina
+        u = compute_density_for_timestep_sampling(
             weighting_scheme=weighting_scheme,
+            batch_size=bsz,
             logit_mean=logit_mean,
             logit_std=logit_std,
             mode_scale=mode_scale,
-        )
+        ).to(device=device, dtype=dtype)
+        
+        indices = (u * num_timesteps).long()
+        timesteps = noise_scheduler.timesteps[indices].to(device=device)
+        sigmas = get_sigmas(noise_scheduler, timesteps, device, n_dim=latents.ndim, dtype=dtype)
     elif timestep_sampling == "sigmoid":
         sigmoid_scale = getattr(args, "sigmoid_scale", 1.0)
         sigmas = torch.sigmoid(sigmoid_scale * torch.randn((bsz,), device=device, dtype=dtype))
+        timesteps = sigmas * num_timesteps
     elif timestep_sampling == "shift":
         # For shift sampling, we need to handle it directly since it uses discrete_flow_shift
         shift = getattr(args, "discrete_flow_shift", 3.185)
@@ -957,14 +965,20 @@ def get_noisy_model_input_and_timesteps(
         sigmas = torch.randn((bsz,), device=device, dtype=dtype)
         sigmas = torch.sigmoid(sigmas * sigmoid_scale)
         sigmas = (sigmas * shift) / (1 + (shift - 1) * sigmas)
+        timesteps = sigmas * num_timesteps
     else:
         # Default sampling (uniform in [0, 1])
         sigmas = torch.rand((bsz,), device=device, dtype=dtype)
-
-    timesteps = sigmas * num_timesteps
+        timesteps = sigmas * num_timesteps
 
     # Flow matching: x_t = (1 - t) * x_1 + t * x_0 where x_1 is clean and x_0 is noise
-    sigmas_broadcast = sigmas.view(-1, 1, 1, 1)
+    if sigmas is not None:
+        sigmas_broadcast = sigmas.view(-1, 1, 1, 1)
+    else:
+        # For cases where sigmas is not set (shouldn't happen with current logic)
+        sigmas = timesteps / num_timesteps
+        sigmas_broadcast = sigmas.view(-1, 1, 1, 1)
+    
     noisy_model_input = (1.0 - sigmas_broadcast) * latents + sigmas_broadcast * noise
 
     return noisy_model_input.to(dtype), timesteps.to(dtype), sigmas
